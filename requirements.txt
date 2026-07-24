@@ -1,0 +1,9 @@
+pillow>=10.3.0
+matplotlib
+os
+random
+webdataset
+torchvision
+huggingface_hub
+torch
+pathlib
