@@ -24,8 +24,8 @@ def _build_loaders(train_urls, val_urls, n_samples, batch_size=128, num_workers=
     train_dataset = (
     wds.WebDataset(train_urls, shardshuffle=1000, nodesplitter=wds.split_by_node, handler=wds.warn_and_continue)
     .shuffle(shuffle_buffer)
-    .decode("pil")
-    .to_tuple("jpg","cls")
+    .decode("pil", handler=wds.warn_and_continue)
+    .to_tuple("jpg","cls", handler=wds.warn_and_continue)
     .map_tuple(train_transform, _identity)
     .batched(batch_size)
     )
@@ -47,8 +47,8 @@ def _build_loaders(train_urls, val_urls, n_samples, batch_size=128, num_workers=
 
     test_dataset = (
         wds.WebDataset(val_urls, shardshuffle=False, nodesplitter=wds.split_by_node, handler=wds.warn_and_continue)
-        .decode("pil")
-        .to_tuple("jpg","cls")
+        .decode("pil", handler=wds.warn_and_continue)
+        .to_tuple("jpg","cls", handler=wds.warn_and_continue)
         .map_tuple(val_transform, _identity)
         .batched(batch_size)
     )
@@ -72,7 +72,7 @@ def make_imagenet_loaders_streaming(n_train_shards=1024, **kw):
 
     hf_token = get_token()
     if hf_token is None:
-        raise RuntimeError("No huggingface token found. Login with huggingface-cli login, then retry.")
+        raise RuntimeError("No huggingface token found. Login with hf auth login, then retry.")
 
     last=n_train_shards-1
     n_samples=1281167 if n_train_shards==1024 else n_train_shards*1250
@@ -81,8 +81,8 @@ def make_imagenet_loaders_streaming(n_train_shards=1024, **kw):
 
 
     base = "https://huggingface.co/datasets/timm/imagenet-1k-wds/resolve/main" 
-    train_urls = f"pipe:curl -s -f -L {base}/imagenet1k-train-{{0000..{last:04d}}}.tar -H 'Authorization:Bearer {hf_token}'" 
-    val_urls = f"pipe:curl -s -f -L {base}/imagenet1k-validation-{{00..63}}.tar -H 'Authorization:Bearer {hf_token}'"
+    train_urls = f"pipe:curl --retry 3 --retry-connrefused -s -f -L {base}/imagenet1k-train-{{0000..{last:04d}}}.tar -H 'Authorization:Bearer {hf_token}'" 
+    val_urls = f"pipe:curl --retry 3 --retry-connrefused -s -f -L {base}/imagenet1k-validation-{{00..63}}.tar -H 'Authorization:Bearer {hf_token}'"
 
     return _build_loaders(train_urls=train_urls, val_urls=val_urls, n_samples=n_samples, **kw)
 

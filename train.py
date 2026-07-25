@@ -22,6 +22,10 @@ def parse_args():
     p.add_argument("--push-to-hub", action="store_true", help="Push best weights to HF after training completes (must specify HF path with --path-in-repo)")
     p.add_argument("--path-in-repo", type=str, help="Path in HF repo to store the weights at, if enabled.")
 
+    args=p.parse_args()
+    if args.push_to_hub and not args.path_in_repo:
+         p.error("--push-to-hub requires --path-in-repo")
+
     return p.parse_args()
 
 def main():
@@ -43,6 +47,7 @@ def main():
     model=VGGA_model(1000).to(device)
     loss_fn=nn.CrossEntropyLoss()
     optimizer=torch.optim.SGD(params=model.parameters(), lr=args.lr, momentum=args.momentum)
+    scheduler=torch.optim.lr_scheduler.CosineAnnealingLR(optimizer,T_max=args.epochs)
     ckpt_dir=Path(args.ckpt_dir)
     ckpt_dir.mkdir(parents=True, exist_ok=True)
 
@@ -57,43 +62,43 @@ def main():
         last_acc, best_acc=last_ckpt["acc"], best_ckpt["acc"]
         model.load_state_dict(last_ckpt["model"])
         optimizer.load_state_dict(last_ckpt["opt"])
-
+        scheduler.load_state_dict(last_ckpt["scheduler"])
         print(f"Previous training checkpoints located. Resuming training from epoch {last_epoch+1}. \nLast recorded accuracy :{last_acc}, best recorded accuracy : {best_acc}")
 
     else:
         best_acc=0.0
         last_epoch=0
 
-    epoch=last_epoch
     for epoch in range(last_epoch+1, args.epochs+1):
-        epoch+=1
         tr_loss, tr_acc= one_train_epoch(model, loss_fn=loss_fn, optimizer=optimizer, train_loader=train_loader, device=device)
         te_loss, te_acc= evaluate(model, loss_fn=loss_fn, test_loader=test_loader, device=device)
 
+        scheduler.step()
         state={
             "model":model.state_dict(),
             "opt":optimizer.state_dict(),
             "acc":te_acc,
             "epoch":epoch,
+            "scheduler":scheduler.state_dict(),
             "args":vars(args)
         }
         save_checkpoint(state,last_path)
 
-        print(f"Epoch {epoch} :\nTrain loss = {tr_loss:.4f}, train accuracy = {tr_acc:.4f}\nTest loss = {te_loss:.4f}, test accuracy = {te_acc:.4f}")
+        print(f"Epoch {epoch} :\nTrain loss = {tr_loss:.4f}, train accuracy = {tr_acc:.4f}\nTest loss = {te_loss:.4f}, test accuracy = {te_acc:.4f}\nCurrent lr : {optimizer.param_groups[0]["lr"]}")
 
         if te_acc>best_acc:
             best_acc=te_acc
             steps_without_improvement=0
             save_checkpoint(state,best_path)
-            if args.push_to_hub and best_path.is_file():
-                push_weights(best_path, args.path_in_repo,commit_message=f"Model weights pushed to hub (val acc={best_acc:.3f}, shards={args.shards})")
+            
         else:
             steps_without_improvement+=1
         
         if steps_without_improvement>=args.stop_train:
             print(f"{args.stop_train} epochs have elapsed without improvement, ending training.")
             break
-
+    if args.push_to_hub and best_path.is_file():
+                    push_weights(best_path, args.path_in_repo,commit_message=f"Model weights pushed to hub (val acc={best_acc:.3f}, shards={args.shards})")
         
 
 
