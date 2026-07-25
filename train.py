@@ -20,7 +20,8 @@ def parse_args():
     p.add_argument("--stop-train", type=int, default=5, help="How many training loops without improvement to run before considering the training to be finished.")
     p.add_argument("--epochs", type=int, default=10, help="The maximum number of epochs to run. The loop will still stop earlier if stop-train triggers.")
     p.add_argument("--push-to-hub", action="store_true", help="Push best weights to HF after training completes (must specify HF path with --path-in-repo)")
-    p.add_argument("--path-in-repo", type=str, help="Path in HF repo to store the weights at, if enabled.")
+    p.add_argument("--path-in-repo", type=str, help="Path in HF repo to store the weights at, if enabled. e.g. 'mymodel/weights.pt'.")
+    p.add_argument("--repo-id", type=str, help="The ID of the repo, e.g. username/models")
 
     args=p.parse_args()
     if args.push_to_hub and not args.path_in_repo:
@@ -84,7 +85,7 @@ def main():
         }
         save_checkpoint(state,last_path)
 
-        print(f"Epoch {epoch} :\nTrain loss = {tr_loss:.4f}, train accuracy = {tr_acc:.4f}\nTest loss = {te_loss:.4f}, test accuracy = {te_acc:.4f}\nCurrent lr : {optimizer.param_groups[0]['lr']}")
+        print(f"\nEpoch {epoch} :\nTrain loss = {tr_loss:.4f}, train accuracy = {tr_acc:.4f}\nTest loss = {te_loss:.4f}, test accuracy = {te_acc:.4f}\nCurrent lr : {optimizer.param_groups[0]['lr']}")
 
         if te_acc>best_acc:
             best_acc=te_acc
@@ -98,7 +99,7 @@ def main():
             print(f"{args.stop_train} epochs have elapsed without improvement, ending training.")
             break
     if args.push_to_hub and best_path.is_file():
-                    push_weights(best_path, args.path_in_repo,commit_message=f"Model weights pushed to hub (val acc={best_acc:.3f}, shards={args.shards})")
+                    push_weights(best_path, args.path_in_repo, args.repo_id, commit_message=f"Model weights pushed to hub (val acc={best_acc:.3f}, shards={args.shards})")
         
 
 
