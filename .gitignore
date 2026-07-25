@@ -11,3 +11,4 @@ wds-cache/
 .idea/
 .end/
 venv/
+*.ipynb

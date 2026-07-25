@@ -1,10 +1,8 @@
-"""doc text here"""
-
 import argparse
 import torch
 import torch.nn as nn
 from pathlib import Path
-
+from  hub import push_weights
 from models import VGGA_model
 from imagenet_data import make_imagenet_loaders_streaming, make_imagenet_loaders_download
 from engine import one_train_epoch, evaluate, save_checkpoint
@@ -21,10 +19,13 @@ def parse_args():
     p.add_argument("--ckpt-dir", type=str, default="checkpoints", help="The directory where the latest and best states are saved. Default is checkpoints in current folder, for runpod pass /workspace/checkpoints .")
     p.add_argument("--stop-train", type=int, default=5, help="How many training loops without improvement to run before considering the training to be finished.")
     p.add_argument("--epochs", type=int, default=10, help="The maximum number of epochs to run. The loop will still stop earlier if stop-train triggers.")
+    p.add_argument("--push-to-hub", action="store_true", help="Push best weights to HF after training completes (must specify HF path with --path-in-repo)")
+    p.add_argument("--path-in-repo", type=str, help="Path in HF repo to store the weights at, if enabled.")
 
     return p.parse_args()
 
 def main():
+    steps_without_improvement=0
     args=parse_args()
     device="cuda" if torch.cuda.is_available() else "cpu"
     print(f"Device={device}, args={args}")
@@ -84,6 +85,11 @@ def main():
             best_acc=te_acc
             steps_without_improvement=0
             save_checkpoint(state,best_path)
+            if args.push_to_hub and best_path.is_file():
+                push_weights(best_path, args.path_in_repo,commit_message=f"Model weights pushed to hub (val acc={best_acc:.3f}, shards={args.shards})")
+        else:
+            steps_without_improvement+=1
+        
         if steps_without_improvement>=args.stop_train:
             print(f"{args.stop_train} epochs have elapsed without improvement, ending training.")
             break
