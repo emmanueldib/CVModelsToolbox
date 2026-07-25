@@ -4,4 +4,3 @@ webdataset
 torchvision
 huggingface_hub
 torch
-pathlib

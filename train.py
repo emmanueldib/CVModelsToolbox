@@ -26,7 +26,7 @@ def parse_args():
     if args.push_to_hub and not args.path_in_repo:
          p.error("--push-to-hub requires --path-in-repo")
 
-    return p.parse_args()
+    return args
 
 def main():
     steps_without_improvement=0
@@ -84,7 +84,7 @@ def main():
         }
         save_checkpoint(state,last_path)
 
-        print(f"Epoch {epoch} :\nTrain loss = {tr_loss:.4f}, train accuracy = {tr_acc:.4f}\nTest loss = {te_loss:.4f}, test accuracy = {te_acc:.4f}\nCurrent lr : {optimizer.param_groups[0]["lr"]}")
+        print(f"Epoch {epoch} :\nTrain loss = {tr_loss:.4f}, train accuracy = {tr_acc:.4f}\nTest loss = {te_loss:.4f}, test accuracy = {te_acc:.4f}\nCurrent lr : {optimizer.param_groups[0]['lr']}")
 
         if te_acc>best_acc:
             best_acc=te_acc
