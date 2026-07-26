@@ -11,9 +11,9 @@ def one_train_epoch(model, loss_fn, optimizer, train_loader, device):
   for images, labels in tqdm(train_loader, desc="Training..."):
     images=images.to(device)
     labels=labels.to(device)
-    logits=model(images)
-
-    train_loss=loss_fn(logits,labels)
+    with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
+      logits=model(images)
+      train_loss=loss_fn(logits,labels)
 
     optimizer.zero_grad()
     train_loss.backward()
