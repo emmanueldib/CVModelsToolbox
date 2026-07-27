@@ -6,6 +6,21 @@ from huggingface_hub import get_token, snapshot_download
 IMAGENET_MEAN=[0.485, 0.456, 0.406]
 IMAGENET_STD=[0.229, 0.224, 0.225]
 
+TRAIN_TRANSFORM=transforms.Compose([
+    transforms.RandomResizedCrop(224),
+    transforms.RandomHorizontalFlip(),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=IMAGENET_MEAN,
+                        std=IMAGENET_STD),
+])
+
+VAL_TRANSFORM=transforms.Compose([
+    transforms.Resize(256),
+    transforms.CenterCrop(224),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
+])
+
 def _identity(x):
     return x
 
@@ -13,20 +28,12 @@ def _build_loaders(train_urls, val_urls, n_samples, batch_size=128, num_workers=
     
     
 
-    train_transform=transforms.Compose([
-        transforms.RandomResizedCrop(224),
-        transforms.RandomHorizontalFlip(),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=IMAGENET_MEAN,
-                            std=IMAGENET_STD),
-    ])
-
     train_dataset = (
     wds.WebDataset(train_urls, shardshuffle=1000, nodesplitter=wds.split_by_node, handler=wds.warn_and_continue)
     .shuffle(shuffle_buffer)
     .decode("pil", handler=wds.warn_and_continue)
     .to_tuple("jpg","cls", handler=wds.warn_and_continue)
-    .map_tuple(train_transform, _identity)
+    .map_tuple(TRAIN_TRANSFORM, _identity)
     .batched(batch_size)
     )
 
@@ -37,22 +44,14 @@ def _build_loaders(train_urls, val_urls, n_samples, batch_size=128, num_workers=
     pin_memory=True,
     )
 
-    val_transform=transforms.Compose([
-    transforms.Resize(256),
-    transforms.CenterCrop(224),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
-    ])
-
 
     test_dataset = (
         wds.WebDataset(val_urls, shardshuffle=False, nodesplitter=wds.split_by_node, handler=wds.warn_and_continue)
         .decode("pil", handler=wds.warn_and_continue)
         .to_tuple("jpg","cls", handler=wds.warn_and_continue)
-        .map_tuple(val_transform, _identity)
+        .map_tuple(VAL_TRANSFORM, _identity)
         .batched(batch_size)
     )
-
 
 
     test_loader=wds.WebLoader(

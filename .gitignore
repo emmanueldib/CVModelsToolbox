@@ -12,3 +12,4 @@ wds-cache/
 .end/
 venv/
 *.ipynb
+workspace/
