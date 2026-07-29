@@ -25,8 +25,7 @@ def parse_args():
     p.add_argument("--model", default=None, help="The model to train. Current options : vgg11 (vgg-11 A) and vgg16 (vgg-16 D)")
 
     args=p.parse_args()
-    if args.push_to_hub and not args.best_path_in_repo:
-         p.error("--push-to-hub requires --path-in-repo")
+    
 
     return args
 
