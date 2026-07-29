@@ -3,9 +3,14 @@
 Personal library of computer vision models implemented in PyTorch, trained on ImageNet-1k streamed/downloaded as WebDataset shards from Hugging Face (`timm/imagenet-1k-wds`).
 
 ## Setup
-
+For non CUDA-devices :
     pip install -r requirements.txt
-    hf auth login   # ImageNet is gated: accept the license on HF first
+
+For CUDA devices :
+    pip install -r requirements_cuda.txt
+
+Then sign into HF (ImageNet is gated: accept the license on HF first)
+    hf auth login   
 
 ## Train
 

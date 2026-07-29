@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 from pathlib import Path
 from  hub import push_weights
-from models import VGGA_model
+from models import VGGA_model, VGGD_model
 from imagenet_data import make_imagenet_loaders_streaming, make_imagenet_loaders_download
 from engine import one_train_epoch, evaluate, save_checkpoint
 
@@ -20,10 +20,9 @@ def parse_args():
     p.add_argument("--stop-train", type=int, default=5, help="How many training loops without improvement to run before considering the training to be finished.")
     p.add_argument("--epochs", type=int, default=10, help="The maximum number of epochs to run. The loop will still stop earlier if stop-train triggers.")
     p.add_argument("--push-to-hub", action="store_true", help="Push best weights to HF after training completes (must specify HF path with --path-in-repo)")
-    p.add_argument("--best-path-in-repo", type=str, help="Path in HF repo to store the best epoch's weights at, if enabled. e.g. 'mymodel/best_weights.pt'.")
-    p.add_argument("--last-path-in-repo", type=str, help="Path in HF repo to store the last epoch's weights at. Only relevant if --backup-weights is passed. e.g. 'mymodel/last_weights.pt'.")
     p.add_argument("--repo-id", type=str, help="The ID of the repo, e.g. username/models")
     p.add_argument("--backup-weights", type=int, default=-1, help="If passed with some int value N > 1, pushes weights to cloud every N epoch. Allows to keep backups of results, but costs time and bandwidth.")
+    p.add_argument("--model", default=None, help="The model to train. Current options : vgg11 (vgg-11 A) and vgg16 (vgg-16 D)")
 
     args=p.parse_args()
     if args.push_to_hub and not args.best_path_in_repo:
@@ -47,15 +46,24 @@ def main():
         **kwargs
     )
 
-    model=VGGA_model(1000).to(device)
+    if args.model=="vgg11":
+        model=VGGA_model(1000).to(device)
+    elif args.model=="vgg16":
+        model=VGGD_model(1000).to(device)
+    else:
+         raise ValueError("Please specify the model to train (see help for available options)")
     loss_fn=nn.CrossEntropyLoss()
     optimizer=torch.optim.SGD(params=model.parameters(), lr=args.lr, momentum=args.momentum)
     scheduler=torch.optim.lr_scheduler.CosineAnnealingLR(optimizer,T_max=args.epochs)
     ckpt_dir=Path(args.ckpt_dir)
     ckpt_dir.mkdir(parents=True, exist_ok=True)
 
-    last_path=Path(args.ckpt_dir)/"last.pt"
-    best_path=Path(args.ckpt_dir)/"best.pt"
+    last_path=Path(args.ckpt_dir)/f"{args.model}_last.pt"
+    best_path=Path(args.ckpt_dir)/f"{args.model}_best.pt"
+
+    best_path_in_repo=f"{args.model}/best.pt"
+    last_path_in_repo=f"{args.model}/last.pt"
+
 
     if last_path.is_file() and best_path.is_file():
         last_ckpt=torch.load(last_path, map_location=device, weights_only=True)
@@ -87,7 +95,7 @@ def main():
         }
         save_checkpoint(state,last_path)
 
-        print(f"\nEpoch {epoch} :\n\n\nTrain loss = {tr_loss:.4f}, train accuracy = {tr_acc:.4f}\nTest loss = {te_loss:.4f}, test accuracy = {te_acc:.4f}\nCurrent lr : {optimizer.param_groups[0]['lr']}")
+        print(f"\nEpoch {epoch}, model={args.model} :\n\n\nTrain loss = {tr_loss:.4f}, train accuracy = {tr_acc:.4f}\nTest loss = {te_loss:.4f}, test accuracy = {te_acc:.4f}\nCurrent lr : {optimizer.param_groups[0]['lr']}")
 
         if te_acc>best_acc:
             best_acc=te_acc
@@ -99,15 +107,15 @@ def main():
 
         if args.backup_weights>=1 and epoch % args.backup_weights==0:
              print("Backing up weights to github")
-             push_weights(best_path, args.best_path_in_repo, args.repo_id, commit_message=f"Model best weights pushed to hub (val acc={best_acc:.3f}, shards={args.shards})")
-             push_weights(last_path, args.last_path_in_repo, args.repo_id, commit_message=f"Model last weights pushed to hub (val acc={best_acc:.3f}, shards={args.shards})")
+             push_weights(best_path, best_path_in_repo, args.repo_id, commit_message=f"Model {args.model} best weights pushed to hub (val acc={best_acc:.3f}, shards={args.shards})")
+             push_weights(last_path, last_path_in_repo, args.repo_id, commit_message=f"Model {args.model} last weights pushed to hub (val acc={best_acc:.3f}, shards={args.shards})")
              
         
         if steps_without_improvement>=args.stop_train:
             print(f"{args.stop_train} epochs have elapsed without improvement, ending training.")
             break
     if args.push_to_hub and best_path.is_file():
-                    push_weights(best_path, args.best_path_in_repo, args.repo_id, commit_message=f"Model weights pushed to hub (val acc={best_acc:.3f}, shards={args.shards})")
+                    push_weights(best_path, best_path_in_repo, args.repo_id, commit_message=f"Model {args.model} weights pushed to hub (val acc={best_acc:.3f}, shards={args.shards})")
         
 
 

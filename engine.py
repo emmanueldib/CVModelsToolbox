@@ -75,10 +75,10 @@ def predict(model, img_path, device, topk=10, categories=CATEGORIES, transform=V
   with torch.inference_mode():
     preds=torch.softmax(model(x), dim=1)
   probs, idx=torch.topk(preds, k=topk)
-  print(probs, idx)
   return probs.squeeze(), [categories[i] for i in idx.squeeze()]
 
-def prediction_graph(model, img_paths_batch, device, topk=10, transform=VAL_TRANSFORM):
+def prediction_graph(model, img_paths_batch, device, categories=None, topk=10, transform=VAL_TRANSFORM):
+  """Generate a summary graph for one model, showing pictures on the left with predictions on the right."""
   probs_list, cats_list = [], []
   for i in range(len(img_paths_batch)):
     probs, cats=predict(model, img_paths_batch[i], device, topk, CATEGORIES, transform)
@@ -87,9 +87,42 @@ def prediction_graph(model, img_paths_batch, device, topk=10, transform=VAL_TRAN
   fig, axes= plt.subplots(figsize=(10, 4.5*len(img_paths_batch)), nrows=len(img_paths_batch), ncols=2, squeeze=False)
   for i in range (len(img_paths_batch)):
     img=np.array(Image.open(img_paths_batch[i]).convert("RGB"))
-    print(cats_list[i])
     axes[i,0].imshow(img)
-    axes[i,1].barh(cats_list[i], probs_list[i])
+    if categories:
+      axes[i,0].set_title(categories[i])
+      colors=["red" if categories[i]==cats_list[i][j] else "blue" for j in range(len(cats_list[i]))]
+    else:
+      colors=["blue" for i in range(len(cats_list[i]))]
+    axes[i,1].barh(cats_list[i], probs_list[i], color=colors)
     axes[i,1].invert_yaxis()
     plt.tight_layout()
 
+def prediction_graph_list(models: list, img_paths_batch, device, categories=None, topk=10, transform=VAL_TRANSFORM):
+  """Generate a summary graph for several models, following the same idea as prediction_graph. Pass models as a list. Can get cluttered if too many models are passed."""
+  probs_list_all_models, cats_list_all_models = [], []
+  for m in range(len(models)):
+    probs_list, cats_list= [], []
+    for i in range(len(img_paths_batch)):
+      probs, cats=predict(models[m], img_paths_batch[i], device, topk, CATEGORIES, transform)
+      probs_list.append(probs)
+      cats_list.append(cats)
+    probs_list_all_models.append(probs_list)
+    cats_list_all_models.append(cats_list)
+  fig, axes= plt.subplots(figsize=(15, 4.5*len(img_paths_batch)), nrows=len(img_paths_batch), ncols=len(models)+1, squeeze=False)
+  for i in range (len(img_paths_batch)):
+    img=np.array(Image.open(img_paths_batch[i]).convert("RGB"))
+    axes[i,0].imshow(img)
+    if categories:
+      axes[i,0].set_title(categories[i])
+      colors=[]
+      for m in range(len(models)):
+        colors.append(["red" if categories[i]==cats_list_all_models[m][i][j] else "blue" for j in range(len(cats_list[i]))])
+      else:
+        colors.append(["blue" for i in range(len(cats_list[i]))])
+
+
+    for m in range(len(models)):
+      axes[i,m+1].barh(cats_list_all_models[m][i], probs_list_all_models[m][i], color=colors[m])
+      axes[i,m+1].invert_yaxis()
+      axes[i,m+1].set_title(f"{models[m].__class__.__name__}")
+    plt.tight_layout()

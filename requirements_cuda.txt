@@ -1,0 +1,8 @@
+--extra-index-url https://download.pytorch.org/whl/cu128
+torch>=2.7
+torchvision>=0.22
+pillow>=10.3.0
+matplotlib
+webdataset
+huggingface_hub
+tqdm
