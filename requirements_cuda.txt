@@ -6,3 +6,4 @@ matplotlib
 webdataset
 huggingface_hub
 tqdm
+wandb

@@ -22,10 +22,14 @@ def parse_args():
     p.add_argument("--push-to-hub", action="store_true", help="Push best weights to HF after training completes (must specify HF path with --path-in-repo)")
     p.add_argument("--repo-id", type=str, help="The ID of the repo, e.g. username/models")
     p.add_argument("--backup-weights", type=int, default=-1, help="If passed with some int value N > 1, pushes weights to cloud every N epoch. Allows to keep backups of results, but costs time and bandwidth.")
-    p.add_argument("--model", default=None, help="The model to train. Current options : vgg11 (vgg-11 A) and vgg16 (vgg-16 D)")
+    p.add_argument("--model", default=None, required=True, choices=["vgg11","vgg16"], help="The model to train. Current options : vgg11 (vgg-11 A) and vgg16 (vgg-16 D)")
+    p.add_argument("--wandb", action="store_true", help="Log metrics to Weights & Biases.")
+    p.add_argument("--wandb-project", type=str, default="cv-models")
 
     args=p.parse_args()
-    
+
+    if (args.push_to_hub or args.backup_weights >= 1) and not args.repo_id:
+        p.error("--push-to-hub/--backup-weights require --repo-id")
 
     return args
 
@@ -35,6 +39,8 @@ def main():
     device="cuda" if torch.cuda.is_available() else "cpu"
     print(f"Device={device}, args={args}")
 
+    run_id=None
+    
 
     make_loaders = make_imagenet_loaders_download if args.download else make_imagenet_loaders_streaming
     kwargs={"local_root": args.data_root} if args.download else {}
@@ -49,8 +55,7 @@ def main():
         model=VGGA_model(1000).to(device)
     elif args.model=="vgg16":
         model=VGGD_model(1000).to(device)
-    else:
-         raise ValueError("Please specify the model to train (see help for available options)")
+    
     loss_fn=nn.CrossEntropyLoss()
     optimizer=torch.optim.SGD(params=model.parameters(), lr=args.lr, momentum=args.momentum)
     scheduler=torch.optim.lr_scheduler.CosineAnnealingLR(optimizer,T_max=args.epochs)
@@ -69,15 +74,28 @@ def main():
         best_ckpt=torch.load(best_path, map_location=device, weights_only=True)
 
         last_epoch=last_ckpt["epoch"]
+        saved_wandb_id=last_ckpt.get("wandb_id")
         last_acc, best_acc=last_ckpt["acc"], best_ckpt["acc"]
         model.load_state_dict(last_ckpt["model"])
         optimizer.load_state_dict(last_ckpt["opt"])
         scheduler.load_state_dict(last_ckpt["scheduler"])
+    
+
         print(f"Previous training checkpoints located. Resuming training from epoch {last_epoch+1}. \nLast recorded accuracy :{last_acc}, best recorded accuracy : {best_acc}")
 
     else:
         best_acc=0.0
         last_epoch=0
+        saved_wandb_id=None
+
+    if args.wandb:
+        import wandb
+        run_id=saved_wandb_id or wandb.util.generate_id()
+        wandb.init(project=args.wandb_project,
+                name=f"{args.model}_bs{args.batch_size}_lr{args.lr}",
+                config=vars(args),
+                id=run_id,
+                resume="allow")
 
     for epoch in range(last_epoch+1, args.epochs+1):
         tr_loss, tr_acc= one_train_epoch(model, loss_fn=loss_fn, optimizer=optimizer, train_loader=train_loader, device=device)
@@ -90,7 +108,8 @@ def main():
             "acc":te_acc,
             "epoch":epoch,
             "scheduler":scheduler.state_dict(),
-            "args":vars(args)
+            "args":vars(args),
+            "wandb_id":run_id
         }
         save_checkpoint(state,last_path)
 
@@ -103,7 +122,9 @@ def main():
             
         else:
             steps_without_improvement+=1
-
+        if args.wandb:
+            wandb.log({"train/loss":tr_loss, "train/acc":tr_acc, "test/loss":te_loss, "test/acc":te_acc, "lr":optimizer.param_groups[0]["lr"],"best_acc":best_acc}, step=epoch)
+        
         if args.backup_weights>=1 and epoch % args.backup_weights==0:
              print("Backing up weights to github")
              push_weights(best_path, best_path_in_repo, args.repo_id, commit_message=f"Model {args.model} best weights pushed to hub (val acc={best_acc:.3f}, shards={args.shards})")
@@ -116,7 +137,8 @@ def main():
     if args.push_to_hub and best_path.is_file():
                     push_weights(best_path, best_path_in_repo, args.repo_id, commit_message=f"Model {args.model} weights pushed to hub (val acc={best_acc:.3f}, shards={args.shards})")
         
-
+    if args.wandb:
+         wandb.finish()
 
 if __name__ == "__main__":
     main()

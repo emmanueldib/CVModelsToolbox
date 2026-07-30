@@ -117,8 +117,10 @@ def prediction_graph_list(models: list, img_paths_batch, device, categories=None
       colors=[]
       for m in range(len(models)):
         colors.append(["red" if categories[i]==cats_list_all_models[m][i][j] else "blue" for j in range(len(cats_list[i]))])
-      else:
-        colors.append(["blue" for i in range(len(cats_list[i]))])
+    else:
+      colors=[]
+      for m in range(len(models)):
+        colors.append(["blue" for j in range(len(cats_list[i]))])
 
 
     for m in range(len(models)):
