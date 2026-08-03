@@ -7,6 +7,14 @@ from models import VGGA_model, VGGD_model, ResNet18, ResNet34, ResNet50, ResNet1
 from imagenet_data import make_imagenet_loaders_streaming, make_imagenet_loaders_download
 from engine import one_train_epoch, evaluate, save_checkpoint
 
+MODELS={"vgg11": lambda: VGGA_model(1000),
+        "vgg16": lambda: VGGD_model(1000),
+        "resnet18": lambda: ResNet18(1000, True),
+        "resnet34": lambda: ResNet34(1000, True),
+        "resnet50": lambda: ResNet50(1000, True),
+        "resnet101": lambda: ResNet101(1000, True)
+        }
+
 def parse_args():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument("--shards", type=int, default=11,help="number of train shards to use (1-1024).")
@@ -22,7 +30,7 @@ def parse_args():
     p.add_argument("--push-to-hub", action="store_true", help="Push best weights to HF after training completes (must specify HF path with --path-in-repo)")
     p.add_argument("--repo-id", type=str, help="The ID of the repo, e.g. username/models")
     p.add_argument("--backup-weights", type=int, default=-1, help="If passed with some int value N > 1, pushes weights to cloud every N epoch. Allows to keep backups of results, but costs time and bandwidth.")
-    p.add_argument("--model", default=None, required=True, choices=["vgg11","vgg16"], help="The model to train. Current options : vgg11 (vgg-11 A) and vgg16 (vgg-16 D)")
+    p.add_argument("--model", default=None, required=True, choices=list(MODELS), help="The model to train. Current options : vgg11 (vgg-11 A) and vgg16 (vgg-16 D)")
     p.add_argument("--wandb", action="store_true", help="Log metrics to Weights & Biases.")
     p.add_argument("--wandb-project", type=str, default="cv-models")
 
@@ -51,10 +59,10 @@ def main():
         **kwargs
     )
 
-    if args.model=="vgg11":
-        model=VGGA_model(1000).to(device)
-    elif args.model=="vgg16":
-        model=VGGD_model(1000).to(device)
+    
+
+    
+    model=MODELS[args.model]().to(device)
     
     loss_fn=nn.CrossEntropyLoss()
     optimizer=torch.optim.SGD(params=model.parameters(), lr=args.lr, momentum=args.momentum)
