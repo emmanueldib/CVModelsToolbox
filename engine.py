@@ -108,7 +108,7 @@ def prediction_graph_list(models: list, img_paths_batch, device, categories=None
       cats_list.append(cats)
     probs_list_all_models.append(probs_list)
     cats_list_all_models.append(cats_list)
-  fig, axes= plt.subplots(figsize=(15, 4.5*len(img_paths_batch)), nrows=len(img_paths_batch), ncols=len(models)+1, squeeze=False)
+  fig, axes= plt.subplots(figsize=(7.5*len(models), 4.5*len(img_paths_batch)), nrows=len(img_paths_batch), ncols=len(models)+1, squeeze=False)
   for i in range (len(img_paths_batch)):
     img=np.array(Image.open(img_paths_batch[i]).convert("RGB"))
     axes[i,0].imshow(img)
