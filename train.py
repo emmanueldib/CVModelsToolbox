@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 from pathlib import Path
 from  hub import push_weights
-from models import VGGA_model, VGGD_model, ResNet18, ResNet34, ResNet50, ResNet101
+from models import VGGA_model, VGGD_model, ResNet18, ResNet34, ResNet50, ResNet101, MobileNet
 from imagenet_data import make_imagenet_loaders_streaming, make_imagenet_loaders_download
 from engine import one_train_epoch, evaluate, save_checkpoint
 
@@ -12,7 +12,8 @@ MODELS={"vgg11": lambda: VGGA_model(1000),
         "resnet18": lambda: ResNet18(1000, True),
         "resnet34": lambda: ResNet34(1000, True),
         "resnet50": lambda: ResNet50(1000, True),
-        "resnet101": lambda: ResNet101(1000, True)
+        "resnet101": lambda: ResNet101(1000, True),
+        "mobilenet": lambda: MobileNet(1000)
         }
 
 def parse_args():
